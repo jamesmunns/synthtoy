@@ -1,0 +1,11 @@
+[package]
+name = "synthtoy"
+version = "0.1.0"
+authors = ["James Munns <james.munns@ferrous-systems.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rodio = "0.11.0"
+bbqueue = "0.4.1"
