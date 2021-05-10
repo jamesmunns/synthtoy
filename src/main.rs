@@ -1,4 +1,4 @@
-use rodio::{play_raw};
+use rodio::play_raw;
 use std::time::{Duration, Instant};
 use std::thread::{sleep, yield_now};
 use rodio::Source;
@@ -7,8 +7,17 @@ use bbqueue::{consts::*, BBBuffer, ConstBBBuffer, Consumer};
 static BB: BBBuffer<U16384> = BBBuffer( ConstBBBuffer::new() );
 
 pub mod objects;
+pub mod config;
+
+use toml;
+use objects::Sample;
 
 fn main() {
+    let config_str = std::fs::read_to_string("op.toml").unwrap();
+    let config: config::Config = toml::from_str(&config_str).unwrap();
+    let mut ops = config::Bidness::from_config(&config);
+    println!("{:?}", config);
+
     let (mut prod, cons) = BB.try_split().unwrap();
     let device = rodio::default_output_device().unwrap();
     let mut num_samples = 0usize;
@@ -16,75 +25,55 @@ fn main() {
     let src = BBSource::new(cons);
     play_raw(&device, src);
 
-    let mut out_sq = objects::SquareWave { freq: 220 };
-    let mut out_si = objects::SineWave { freq: 4.0 };
-    let mut out_si2 = objects::SineWave { freq: 2.0 };
-
-    let mut out2_sq = objects::SquareWave { freq: 440 };
-    let mut out2_si = objects::SineWave { freq: 8.0 };
-    let mut out2_si2 = objects::SawWave { freq: 0.5 };
-
-    let mut out3_sq = objects::SawWave { freq: 110.0 };
-    let mut out3_si = objects::SineWave { freq: 1.0 };
-    let mut out3_si2 = objects::SineWave { freq: 0.25 };
-
     loop {
         match prod.grant_max_remaining(10000000) {
             Ok(mut wgr) if wgr.len() >= 4 => {
                 let mut rel = 0;
                 for ch in wgr.chunks_exact_mut(4) {
-                    let smpl_si = out_si.next(num_samples);
-                    let smpl_sq = out_sq.next(num_samples);
-                    let smpl_si2 = out_si2.next(num_samples);
-
-                    // Modulate
-                    let smpl = smpl_si * smpl_sq * smpl_si2;
-
-                    let smpl2_si = out2_si.next(num_samples);
-                    let smpl2_sq = out2_sq.next(num_samples);
-                    let smpl2_si2 = out2_si2.next(num_samples + 12000);
-
-                    // Modulate
-                    let smpl2 = smpl2_si * smpl2_sq * smpl2_si2;
-
-                    let smpl3_si = out3_si.next(num_samples);
-                    let smpl3_sq = out3_sq.next(num_samples);
-                    let smpl3_si2 = out3_si2.next(num_samples);
-
-                    // Modulate
-                    let smpl3 = smpl3_si * smpl3_sq * smpl3_si2;
+                    // modulate each
+                    let mut samps = vec![];
+                    for g in ops.b_groups.iter_mut() {
+                        let mut src = g.source.next(num_samples);
+                        let ops = g.operators.iter_mut().map(|op| {
+                            op.next(num_samples)
+                        }).for_each(|samp| {
+                            src *= samp;
+                        });
+                        samps.push(src);
+                    }
 
                     // combine
-                    let smpl = (smpl + smpl2 + smpl3) / 3.0;
+                    let len = samps.len();
+                    let samp: f32 = samps.into_iter().sum::<f32>() / (len as f32);
 
                     // let smpl = smpl3_sq;
 
                     num_samples = num_samples.wrapping_add(1);
-                    ch.copy_from_slice(&smpl.to_le_bytes());
+                    ch.copy_from_slice(&samp.to_le_bytes());
                     rel += 4;
 
-                    if num_samples % (48000 * 2) == 0 {
-                        out_si.freq *= 1.5;
-                    }
-                    if num_samples % (48000 * 16) == 0 {
-                        out_si.freq = 4.0;
-                    }
+                    // if num_samples % (48000 * 2) == 0 {
+                    //     out_si.freq *= 1.5;
+                    // }
+                    // if num_samples % (48000 * 16) == 0 {
+                    //     out_si.freq = 4.0;
+                    // }
 
-                    match (num_samples / 48000) % 4 {
-                        0 => {
-                            out3_sq.freq = 110.0;
-                        }
-                        1 => {
+                    // match (num_samples / 48000) % 4 {
+                    //     0 => {
+                    //         out3_sq.freq = 110.0;
+                    //     }
+                    //     1 => {
 
-                        }
-                        2 => {
-                            out3_sq.freq = 220.0;
-                        }
-                        3 => {
-                            out3_sq.freq = 440.0;
-                        }
-                        _ => unreachable!(),
-                    }
+                    //     }
+                    //     2 => {
+                    //         out3_sq.freq = 220.0;
+                    //     }
+                    //     3 => {
+                    //         out3_sq.freq = 440.0;
+                    //     }
+                    //     _ => unreachable!(),
+                    // }
                 }
 
                 wgr.commit(rel);
@@ -165,90 +154,6 @@ impl Source for BBSource {
     #[inline]
     fn current_frame_len(&self) -> Option<usize> {
         None
-    }
-
-    #[inline]
-    fn channels(&self) -> u16 {
-        1
-    }
-
-    #[inline]
-    fn sample_rate(&self) -> u32 {
-        48000
-    }
-
-    #[inline]
-    fn total_duration(&self) -> Option<Duration> {
-        None
-    }
-}
-
-/// An infinite source that produces a sine.
-///
-/// Always has a rate of 48kHz and one channel.
-#[derive(Clone, Debug)]
-pub struct SineWave {
-    freq: f32,
-    num_sample: usize,
-    start: Instant,
-    last: Instant,
-}
-
-impl SineWave {
-    /// The frequency of the sine.
-    #[inline]
-    pub fn new(freq: u32) -> SineWave {
-        SineWave {
-            freq: freq as f32,
-            num_sample: 0,
-            start: Instant::now(),
-            last: Instant::now(),
-        }
-    }
-}
-
-impl Iterator for SineWave {
-    type Item = f32;
-
-    #[inline]
-    fn next(&mut self) -> Option<f32> {
-        if self.num_sample == 0 {
-            self.start = Instant::now();
-        }
-
-        let theo_duration = (Duration::from_secs(1) / 48000) * self.num_sample as u32;
-
-        // let interval = self.last.elapsed();
-        self.last = Instant::now();
-
-        let elapsed = self.start.elapsed();
-
-        let rpt = if elapsed > theo_duration {
-            // Elapsed is MORE than the theoretical duration
-            // We're behind schedule
-            format!("BEHIND {:?}", elapsed - theo_duration)
-        } else {
-            // Elapsed is LESS than the theoretical duration
-            // We're ahead of schedule
-            format!("AHEAD {:?}", theo_duration - elapsed)
-        };
-
-        // println!("{} - {} - {:?}", self.freq, rpt, self.start.elapsed());
-        self.num_sample = self.num_sample.wrapping_add(1);
-
-        if self.num_sample >= 12000 {
-            return None;
-        }
-
-        let value = 2.0 * 3.14159265 * self.freq * self.num_sample as f32 / 48000.0;
-        Some(value.sin())
-    }
-}
-
-impl Source for SineWave {
-    #[inline]
-    fn current_frame_len(&self) -> Option<usize> {
-        Some(128)
     }
 
     #[inline]

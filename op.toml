@@ -1,0 +1,43 @@
+
+
+[[group]]
+
+[group.source]
+frequency = 220.0
+op_kind = "Square"
+
+[[group.operators]]
+frequency = 4.0
+op_kind = "Sine"
+
+[[group.operators]]
+frequency = 2.0
+op_kind = "Sine"
+
+[[group]]
+
+[group.source]
+frequency = 440.0
+op_kind = "Square"
+
+[[group.operators]]
+frequency = 8.0
+op_kind = "Sine"
+
+[[group.operators]]
+frequency = 0.5
+op_kind = "Saw"
+
+[[group]]
+
+[group.source]
+frequency = 110.0
+op_kind = "Saw"
+
+[[group.operators]]
+frequency = 1.0
+op_kind = "Sine"
+
+[[group.operators]]
+frequency = 0.25
+op_kind = "Sine"
