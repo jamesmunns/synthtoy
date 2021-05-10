@@ -15,7 +15,7 @@ use objects::Sample;
 fn main() {
     let config_str = std::fs::read_to_string("op.toml").unwrap();
     let config: config::Config = toml::from_str(&config_str).unwrap();
-    let mut ops = config::Bidness::from_config(&config);
+    let mut ops = config::Bidness::from_config(&config, 48_000);
     println!("{:?}", config);
 
     let (mut prod, cons) = BB.try_split().unwrap();

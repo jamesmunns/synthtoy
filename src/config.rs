@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::VecDeque;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -14,23 +15,35 @@ pub struct Group {
 #[derive(Debug, Deserialize)]
 pub struct Operator {
     frequency: f32,
-    op_kind: OperatorKind
+    op_kind: OperatorKind,
+
+    #[serde(default)]
+    stepper: Stepper,
 }
 
 impl Operator {
     fn into_dyn_sample(&self) -> Box<dyn Sample> {
         match self.op_kind {
             OperatorKind::Sine => {
-                let o = objects::SineWave { freq: self.frequency };
+                let o = objects::SineWave {
+                    freq: self.frequency,
+                    stepper: self.stepper.clone(),
+                };
                 Box::new(o)
             }
             OperatorKind::Square => {
                 // TODO(AJM): `as usize`?
-                let o = objects::SquareWave { freq: self.frequency as usize };
+                let o = objects::SquareWave {
+                    freq: self.frequency,
+                    stepper: self.stepper.clone(),
+                };
                 Box::new(o)
             }
             OperatorKind::Saw => {
-                let o = objects::SawWave { freq: self.frequency };
+                let o = objects::SawWave {
+                    freq: self.frequency,
+                    stepper: self.stepper.clone(),
+                };
                 Box::new(o)
             }
             OperatorKind::Triangle => todo!()
@@ -46,6 +59,29 @@ pub enum OperatorKind {
     Triangle,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct Stepper {
+    pub bpm: usize,
+    pub steps: VecDeque<StepKind>,
+}
+
+impl Default for Stepper {
+    fn default() -> Self {
+        Stepper {
+            bpm: 1,
+            steps: VecDeque::new(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "kind", content = "val")]
+pub enum StepKind {
+    Nop,
+    FreqMult(f32),
+    FreqSet(f32),
+}
+
 pub struct Bidness {
     pub b_groups: Vec<BGroup>,
 }
@@ -56,17 +92,19 @@ use crate::objects::{
 };
 
 pub struct BGroup {
+    pub samps_per_sec: usize,
     pub source: Box<dyn Sample>,
     pub operators: Vec<Box<dyn Sample>>,
 }
 
 impl Bidness {
-    pub fn from_config(cfg: &Config) -> Self {
+    pub fn from_config(cfg: &Config, samps_per_sec: usize) -> Self {
         let mut ret = vec![];
         for g in cfg.group.iter() {
             let src = g.source.into_dyn_sample();
             let ops = g.operators.iter().map(Operator::into_dyn_sample).collect();
             ret.push(BGroup {
+                samps_per_sec,
                 source: src,
                 operators: ops,
             });
