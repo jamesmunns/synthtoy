@@ -37,11 +37,10 @@ op_kind = "Sine"
 source = { frequency = 440.0, op_kind = "Square" }
 operators = [
     { frequency = 8.0, op_kind = "Sine" },
-    { frequency = 0.5, op_kind = "Saw" },
+    { frequency = 0.5, op_kind = "Saw", phase_steps = 12000 },
 ]
 
 [[group]]
-
 operators = [
     { frequency = 1.0, op_kind = "Sine" },
     { frequency = 0.25, op_kind = "Sine" },
