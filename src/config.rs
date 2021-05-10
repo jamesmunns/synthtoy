@@ -18,6 +18,9 @@ pub struct Operator {
     op_kind: OperatorKind,
 
     #[serde(default)]
+    phase_steps: usize,
+
+    #[serde(default)]
     stepper: Stepper,
 }
 
@@ -28,6 +31,7 @@ impl Operator {
                 let o = objects::SineWave {
                     freq: self.frequency,
                     stepper: self.stepper.clone(),
+                    phase_steps: self.phase_steps,
                 };
                 Box::new(o)
             }
@@ -36,6 +40,7 @@ impl Operator {
                 let o = objects::SquareWave {
                     freq: self.frequency,
                     stepper: self.stepper.clone(),
+                    phase_steps: self.phase_steps,
                 };
                 Box::new(o)
             }
@@ -43,10 +48,11 @@ impl Operator {
                 let o = objects::SawWave {
                     freq: self.frequency,
                     stepper: self.stepper.clone(),
+                    phase_steps: self.phase_steps,
                 };
                 Box::new(o)
             }
-            OperatorKind::Triangle => todo!()
+            OperatorKind::Triangle => todo!(),
         }
     }
 }
@@ -86,10 +92,7 @@ pub struct Bidness {
     pub b_groups: Vec<BGroup>,
 }
 
-use crate::objects::{
-    Sample,
-    self,
-};
+use crate::objects::{self, Sample};
 
 pub struct BGroup {
     pub samps_per_sec: usize,
@@ -109,8 +112,6 @@ impl Bidness {
                 operators: ops,
             });
         }
-        Bidness {
-            b_groups: ret
-        }
+        Bidness { b_groups: ret }
     }
 }

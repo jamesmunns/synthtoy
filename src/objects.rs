@@ -1,12 +1,14 @@
-use crate::config::{Stepper, StepKind};
+use crate::config::{StepKind, Stepper};
 
 pub struct SineWave {
     pub freq: f32,
     pub stepper: Stepper,
+    pub phase_steps: usize,
 }
 
 impl Sample for SineWave {
     fn next(&mut self, num_samples: usize) -> f32 {
+        let num_samples = num_samples.wrapping_add(self.phase_steps);
         if !self.stepper.steps.is_empty() {
             // TODO(AJM): this is just bad for a lot of reasons
             let samps_per_beat = (self.stepper.bpm * 48000) / 60;
@@ -33,10 +35,12 @@ impl Sample for SineWave {
 pub struct SquareWave {
     pub freq: f32,
     pub stepper: Stepper,
+    pub phase_steps: usize,
 }
 
 impl Sample for SquareWave {
     fn next(&mut self, num_samples: usize) -> f32 {
+        let num_samples = num_samples.wrapping_add(self.phase_steps);
         if !self.stepper.steps.is_empty() {
             // TODO(AJM): this is just bad for a lot of reasons
             let samps_per_beat = (self.stepper.bpm * 48000) / 60;
@@ -67,10 +71,12 @@ impl Sample for SquareWave {
 pub struct SawWave {
     pub freq: f32,
     pub stepper: Stepper,
+    pub phase_steps: usize,
 }
 
 impl Sample for SawWave {
     fn next(&mut self, num_samples: usize) -> f32 {
+        let num_samples = num_samples.wrapping_add(self.phase_steps);
         if !self.stepper.steps.is_empty() {
             // TODO(AJM): this is just bad for a lot of reasons
             let samps_per_beat = (self.stepper.bpm * 48000) / 60;
@@ -99,13 +105,3 @@ impl Sample for SawWave {
 pub trait Sample {
     fn next(&mut self, num_samples: usize) -> f32;
 }
-
-// 1hz
-
-// 00000-24000 off
-// 24000-48000 on
-
-// 2hz
-
-// 00000-12000 off
-// 12000-24000 on
